@@ -1,4 +1,4 @@
-package com.spring.reactive.observer.impl;
+package com.spring.reactive.observer;
 
 public interface RxObserver<T> {
     void onNext(T next);
