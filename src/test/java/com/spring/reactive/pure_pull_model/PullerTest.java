@@ -8,6 +8,9 @@ import java.util.Queue;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 
+/**
+ * 대략 10초 정도 걸린다.
+ */
 public class PullerTest {
 
     @Test
