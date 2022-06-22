@@ -16,12 +16,18 @@ public class PullerTest {
         CountDownLatch l = new CountDownLatch(1);
         Puller puller = new Puller();
 
+        /**
+         * subscribe를 하면 dbClient를 new Subscriber가 구독한다.
+         */
         puller.list(10)
                 .subscribe(new Subscriber<Item>() {
                     final ArrayList<Item> list = new ArrayList<>();
 
                     @Override
                     public void onSubscribe(Subscription s) {
+                        /**
+                         * takeFilterInner의 request
+                         */
                         s.request(Long.MAX_VALUE);
                     }
 

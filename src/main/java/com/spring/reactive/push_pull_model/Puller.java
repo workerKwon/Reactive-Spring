@@ -7,6 +7,10 @@ public class Puller {
 
     public Publisher<Item> list(int count) {
         Publisher<Item> source = dbClient.getStreamOfItems();
+
+        /**
+         * publisher를 상속하고 subscriber와 subscription을 구현한 inner class로 바로 subscribe를 한다.
+         */
         TakeFilterOperator<Item> takeFilter = new TakeFilterOperator<>(source, count, this::isValid);
         return takeFilter;
     }

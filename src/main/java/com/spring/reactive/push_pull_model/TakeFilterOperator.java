@@ -5,7 +5,7 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import java.util.function.Predicate;
@@ -24,9 +24,17 @@ public class TakeFilterOperator<T> implements Publisher<T> {
 
     @Override
     public void subscribe(Subscriber s) {
+        /**
+         * dbClient(데이터 제공 Publisher)의 구독 시작
+         * s - 실제 subscriber
+         */
         source.subscribe(new TakeFilterInner<>(s, take, predicate));
     }
 
+    /**
+     * 실제 subscriber의 요구사항을 제어하면서 또한 실제 Subscriber로서 메인 소스에 전달되는 역할
+     * @param <T>
+     */
     static final class TakeFilterInner<T> implements Subscriber<T>, Subscription {
 
         final Subscriber<T> actual;
@@ -53,7 +61,7 @@ public class TakeFilterOperator<T> implements Publisher<T> {
             this.take = take;
             this.remaining = take;
             this.predicate = predicate;
-            this.queue = new ConcurrentLinkedDeque<>();
+            this.queue = new ConcurrentLinkedQueue<>();
         }
 
         @Override
@@ -87,6 +95,9 @@ public class TakeFilterOperator<T> implements Publisher<T> {
                 boolean isEmpty = queue.isEmpty();
 
                 if (isValid && r > 0 && isEmpty) {
+                    /**
+                     * a 는 publisher에 직접 구독한 subscriber. subscriber한테 item을 넘겨줘서 subscriber.List에 담는다.
+                     */
                     a.onNext(t);
                     remaining--;
 
@@ -145,6 +156,7 @@ public class TakeFilterOperator<T> implements Publisher<T> {
                 actual.onComplete();
             }
         }
+
 
         @Override
         public void request(long n) {
