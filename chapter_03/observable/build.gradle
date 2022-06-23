@@ -1,0 +1,31 @@
+plugins {
+	id 'org.springframework.boot' version '2.6.9'
+	id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+	id 'java'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = '11'
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'io.reactivex:rxnetty-http:0.5.3-rc.1'
+	implementation 'io.reactivex.rxjava2:rxjava:2.2.2'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'io.reactivex:rxjava:1.3.8'
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.reactivestreams:reactive-streams-tck:1.0.2'
+	testImplementation 'org.hamcrest:java-hamcrest:2.0.0.0'
+	testImplementation 'junit:junit:4.12'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
