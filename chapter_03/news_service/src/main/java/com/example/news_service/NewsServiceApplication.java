@@ -1,5 +1,6 @@
 package com.example.news_service;
 
+import com.example.news_service.dto.News;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.client.model.Filters;
@@ -15,7 +16,6 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.mongo.MongoProperties;
 import org.springframework.context.annotation.Bean;
-import rx.Observable;
 
 @SpringBootApplication
 public class NewsServiceApplication {
