@@ -16,6 +16,12 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.mongo.MongoProperties;
 import org.springframework.context.annotation.Bean;
+import ratpack.jackson.Jackson;
+import ratpack.server.RatpackServer;
+import ratpack.server.ServerConfig;
+
+import java.util.Arrays;
+import java.util.Date;
 
 @SpringBootApplication
 public class NewsServiceApplication {
@@ -69,8 +75,63 @@ public class NewsServiceApplication {
 				.filter(Filters.eq("category", "tech"));
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws Exception {
 		SpringApplication.run(NewsServiceApplication.class, args);
+
+		RatpackServer.start(ratpackServerSpec ->
+				ratpackServerSpec.serverConfig(ServerConfig.embedded().port(NEWS_SERVER_PORT))
+						.handlers(chain -> chain.get(context -> context.render(Jackson.json(Arrays.asList(
+								News.builder()
+										.author("kwon")
+										.category("kwon")
+										.content("kwon")
+										.publishedOn(new Date())
+										.title("kwon")
+										.build(),
+								News.builder()
+										.author("tae")
+										.category("tae")
+										.content("tae")
+										.publishedOn(new Date())
+										.title("tae")
+										.build(),
+								News.builder()
+										.author("park")
+										.category("park")
+										.content("park")
+										.publishedOn(new Date())
+										.title("park")
+										.build(),
+								News.builder()
+										.author("kim")
+										.category("kim")
+										.content("kim")
+										.publishedOn(new Date())
+										.title("kim")
+										.build(),
+								News.builder()
+										.author("lee")
+										.category("lee")
+										.content("lee")
+										.publishedOn(new Date())
+										.title("lee")
+										.build(),
+								News.builder()
+										.author("hae")
+										.category("hae")
+										.content("hae")
+										.publishedOn(new Date())
+										.title("hae")
+										.build(),
+								News.builder()
+										.author("jung")
+										.category("jung")
+										.content("jung")
+										.publishedOn(new Date())
+										.title("jung")
+										.build()
+						)))))
+		);
 	}
 
 	private interface DatabaseNewsService {

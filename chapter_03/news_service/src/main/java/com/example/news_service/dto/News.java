@@ -1,12 +1,20 @@
 package com.example.news_service.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import lombok.NonNull;
+import lombok.*;
 import org.bson.types.ObjectId;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Immutable;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.Date;
 
+@Data
+@Document
+@Immutable
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class News {
 
     @Id
