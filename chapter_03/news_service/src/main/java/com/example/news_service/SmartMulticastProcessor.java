@@ -24,6 +24,10 @@ public class SmartMulticastProcessor implements Processor<NewsLetter, NewsLetter
     Throwable throwable;
     NewsLetter cacheNewsLetter;
 
+    volatile     Subscription upstream;
+    static final AtomicReferenceFieldUpdater<SmartMulticastProcessor, Subscription> UPSTREAM =
+            AtomicReferenceFieldUpdater.newUpdater(SmartMulticastProcessor.class, Subscription.class, "upstream");
+
     volatile     InnerSubscription[] active = EMPTY;
     static final AtomicReferenceFieldUpdater<SmartMulticastProcessor, InnerSubscription[]> ACTIVE =
             AtomicReferenceFieldUpdater.newUpdater(SmartMulticastProcessor.class, InnerSubscription[].class, "active");
@@ -50,23 +54,46 @@ public class SmartMulticastProcessor implements Processor<NewsLetter, NewsLetter
     }
 
     @Override
-    public void onSubscribe(Subscription s) {
+    public void onSubscribe(Subscription subscription) {
+        Objects.requireNonNull(subscription);
 
+        if (UPSTREAM.compareAndSet(this, null, subscription)) {
+            subscription.request(Long.MAX_VALUE);
+        } else {
+            subscription.cancel();
+        }
     }
 
     @Override
     public void onNext(NewsLetter newsLetter) {
+        Objects.requireNonNull(newsLetter);
 
+        InnerSubscription[] active = this.active;
+        cacheNewsLetter = newsLetter;
+
+        for (InnerSubscription subscription : active) {
+            subscription.tryEmit(newsLetter);
+        }
     }
 
     @Override
     public void onError(Throwable t) {
+        Objects.requireNonNull(t);
+        InnerSubscription[] active = ACTIVE.getAndSet(this, TERMINATED);
+        throwable = t;
 
+        for (InnerSubscription subscription : active) {
+            subscription.onError(t);
+        }
     }
 
     @Override
     public void onComplete() {
+        InnerSubscription[] active = ACTIVE.getAndSet(this, TERMINATED);
 
+        for (InnerSubscription subscription : active) {
+            subscription.onComplete();
+        }
     }
 
     boolean isTerminated() {
@@ -92,6 +119,41 @@ public class SmartMulticastProcessor implements Processor<NewsLetter, NewsLetter
                 System.arraycopy(subscriptions, 0, copied, 0, n);
             }
             copied[n] = subscription;
+
+            if (ACTIVE.compareAndSet(this, subscriptions, copied)) {
+                return true;
+            }
+        }
+    }
+
+    private boolean remove(InnerSubscription subscription) {
+        for (;;) {
+            InnerSubscription[] subscriptions = active;
+
+            if(isTerminated()) {
+                return false;
+            }
+
+            int n = subscriptions.length;
+
+            if (n == 0) {
+                return false;
+            }
+
+            InnerSubscription[] copied = new InnerSubscription[n - 1];
+            int index = (n - 1) & hash(subscription);
+
+            if (!subscriptions[index].equals(subscription)) {
+                return false;
+            }
+
+            if (index > 0) {
+                System.arraycopy(subscriptions, 0, copied, 0, index);
+            }
+
+            if (index + 1 < n) {
+                System.arraycopy(subscriptions, index + 1, copied, index, n - index - 1);
+            }
 
             if (ACTIVE.compareAndSet(this, subscriptions, copied)) {
                 return true;
@@ -148,6 +210,16 @@ public class SmartMulticastProcessor implements Processor<NewsLetter, NewsLetter
             if (done) {
                 return;
             }
+            tryDrain();
+        }
+
+        void onComplete() {
+            if (done) {
+                return;
+            }
+
+            parent.remove(this);
+
             tryDrain();
         }
 
@@ -209,6 +281,42 @@ public class SmartMulticastProcessor implements Processor<NewsLetter, NewsLetter
                 return ((NamedSubscriber) actual).getName();
             }
             return null;
+        }
+
+        void tryEmit(NewsLetter newsLetter) {
+            if (done) {
+                return;
+            }
+
+            int wip;
+            if ((wip = WIP.incrementAndGet(this)) > 1) {
+                sent = false;
+                return;
+            }
+
+            Subscriber<? super NewsLetter> actualSubscriber = actual;
+            long req = requested;
+
+            for (;;) {
+                if (req > 0) {
+                    actualSubscriber.onNext(newsLetter.withRecipient(getRecipient()));
+                    sent = true;
+
+                    REQUESTED.decrementAndGet(this);
+                    this.wip = 0;
+
+                    return;
+                } else {
+                    wip = WIP.addAndGet(this, -wip);
+
+                    if (wip == 0) {
+                        sent = false;
+                        return;
+                    } else {
+                        req = requested;
+                    }
+                }
+            }
         }
     }
 }
