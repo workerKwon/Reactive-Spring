@@ -1,6 +1,7 @@
 package com.example.news_service;
 
 import com.example.news_service.dto.NewsLetter;
+import javassist.runtime.Inner;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -10,6 +11,11 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
+/**
+ * 최신뉴스 요약본을 캐싱한다. 멀티 캐스트를 지원하므로 구독자별로 동일한 흐름을 별도로 만들 필요가 없이 한번에 처리 가능하다.
+ * 스마트 메일 추적 매커니즘으로 이전 다이제스트를 읽은 사용자에게만 뉴스레터를 보낸다.
+ * 실제 구독자가 SmartMuSmartMulticastProcessor를 구독하고 SmartMulticastProcessor는 Scheduler를 구독한다.
+ */
 public class SmartMulticastProcessor implements Processor<NewsLetter, NewsLetter> {
 
     private static final InnerSubscription[] EMPTY = new InnerSubscription[0];
@@ -25,8 +31,22 @@ public class SmartMulticastProcessor implements Processor<NewsLetter, NewsLetter
     @Override
     public void subscribe(Subscriber<? super NewsLetter> actual) {
         Objects.requireNonNull(actual);
+        InnerSubscription subscription = new InnerSubscription(actual, this);
 
+        /**
+         * 구독 추가가 성공/실패
+         */
+        if (add(subscription)) {
+            actual.onSubscribe(subscription);
+        } else {
+            actual.onSubscribe(subscription);
 
+            if(throwable == null) {
+                actual.onComplete();
+            } else {
+                actual.onError(throwable);
+            }
+        }
     }
 
     @Override
@@ -51,6 +71,37 @@ public class SmartMulticastProcessor implements Processor<NewsLetter, NewsLetter
 
     boolean isTerminated() {
         return active == TERMINATED;
+    }
+
+    private boolean add(InnerSubscription subscription) {
+        for (;;) {
+            InnerSubscription[] subscriptions = active;
+            if (isTerminated()) {
+                return false;
+            }
+
+            int n = subscriptions.length;
+            InnerSubscription[] copied = new InnerSubscription[n + 1];
+
+            if (n > 0) {
+                int index = (n-1) & hash(subscription);
+                if (subscriptions[index].equals(subscription)) { // 새로운 구독이 이미 있는 구독이라면 false
+                    return false;
+                }
+
+                System.arraycopy(subscriptions, 0, copied, 0, n);
+            }
+            copied[n] = subscription;
+
+            if (ACTIVE.compareAndSet(this, subscriptions, copied)) {
+                return true;
+            }
+        }
+    }
+
+    static final int hash(Object key) {
+        int h;
+        return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
     }
 
     private static class InnerSubscription implements Subscription {
