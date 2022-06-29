@@ -33,22 +33,22 @@ public class SmartMulticastProcessor implements Processor<NewsLetter, NewsLetter
             AtomicReferenceFieldUpdater.newUpdater(SmartMulticastProcessor.class, InnerSubscription[].class, "active");
 
     @Override
-    public void subscribe(Subscriber<? super NewsLetter> actual) {
-        Objects.requireNonNull(actual);
-        InnerSubscription subscription = new InnerSubscription(actual, this);
+    public void subscribe(Subscriber<? super NewsLetter> subscriber) {
+        Objects.requireNonNull(subscriber);
+        InnerSubscription subscription = new InnerSubscription(subscriber, this);
 
         /**
          * 구독 추가가 성공/실패
          */
         if (add(subscription)) {
-            actual.onSubscribe(subscription);
+            subscriber.onSubscribe(subscription);
         } else {
-            actual.onSubscribe(subscription);
+            subscriber.onSubscribe(subscription);
 
             if(throwable == null) {
-                actual.onComplete();
+                subscriber.onComplete();
             } else {
-                actual.onError(throwable);
+                subscriber.onError(throwable);
             }
         }
     }
@@ -64,6 +64,9 @@ public class SmartMulticastProcessor implements Processor<NewsLetter, NewsLetter
         }
     }
 
+    /**
+     * scheduler에서 하루마다 데이터가 발생하면 onNext로 읽어와서 처리한다.
+     */
     @Override
     public void onNext(NewsLetter newsLetter) {
         Objects.requireNonNull(newsLetter);
@@ -166,6 +169,9 @@ public class SmartMulticastProcessor implements Processor<NewsLetter, NewsLetter
         return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
     }
 
+    /**
+     * 구독자와 SmartMulticastProcessor 사이에서 관리하는 Subscription
+     */
     private static class InnerSubscription implements Subscription {
         final Subscriber<? super NewsLetter> actual;
         final SmartMulticastProcessor parent;
@@ -180,7 +186,6 @@ public class SmartMulticastProcessor implements Processor<NewsLetter, NewsLetter
          * - Read할 때마다 CPU cache 값이 아닌 Main Memory에서 읽는다.
          * - Write할 때에도 Main Memory에 까지 작성하는 것.
          */
-
         volatile     long                                      requested;
         static final AtomicLongFieldUpdater<InnerSubscription> REQUESTED =
                 AtomicLongFieldUpdater.newUpdater(InnerSubscription.class, "requested");
@@ -198,12 +203,16 @@ public class SmartMulticastProcessor implements Processor<NewsLetter, NewsLetter
                 onError(throwable = new IllegalArgumentException("negative subscription request"));
                 return;
             }
-            // TODO 진행
+
+            SubscriptionUtils.request(n, this, REQUESTED);
+
+            tryDrain();
         }
 
         @Override
         public void cancel() {
-
+            parent.remove(this);
+            done = true;
         }
 
         void onError(Throwable t) {
